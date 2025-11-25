@@ -5,7 +5,7 @@ import { z } from "zod";
 export interface DataFile {
   id: string;
   filename: string;
-  fileType: 'csv' | 'xlsx' | 'json';
+  fileType: 'csv' | 'xlsx' | 'json' | 'pdf';
   uploadedAt: Date;
   rowCount: number;
   columnCount: number;
@@ -39,11 +39,33 @@ export interface AIInsights {
   trends: string[];
 }
 
+export interface ExtractedMetrics {
+  rowCount: number;
+  columnCount: number;
+  dataCompleteness: number;
+  columnMetrics: Record<string, {
+    type: string;
+    nullCount: number;
+    nullPercentage: number;
+    uniqueCount: number;
+    min?: number;
+    max?: number;
+    mean?: number;
+    median?: number;
+    stdDev?: number;
+    sum?: number;
+    topValues?: Array<{ value: string; count: number; percentage: number }>;
+  }>;
+  correlations?: Record<string, Record<string, number>>;
+  keyInsights: string[];
+}
+
 export interface AnalysisResult {
   file: DataFile;
   parsedData: ParsedData;
   visualizations: ChartConfig[];
   aiInsights: AIInsights;
+  metrics?: ExtractedMetrics;
 }
 
 // Zod schemas for validation

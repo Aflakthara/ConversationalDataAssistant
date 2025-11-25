@@ -9,11 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AIInsightsPanel } from "@/components/ai-insights-panel";
 import { DataTable } from "@/components/data-table";
 import { VisualizationCard } from "@/components/visualization-card";
-import type { AnalysisResult } from "@shared/schema";
+import { CreateChartDialog } from "@/components/create-chart-dialog";
+import type { AnalysisResult, ChartConfig } from "@shared/schema";
 
 export default function AnalysisPage() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
+  
+  // All hooks must be called before any conditional returns
+  const [customCharts, setCustomCharts] = React.useState<ChartConfig[]>([]);
 
   const { data: analysis, isLoading } = useQuery<AnalysisResult>({
     queryKey: ['/api/analysis', id],
@@ -40,7 +44,8 @@ export default function AnalysisPage() {
     );
   }
 
-  const { file, parsedData, visualizations, aiInsights } = analysis;
+  const { file, parsedData, visualizations: initialVisualizations, aiInsights } = analysis;
+  const visualizations = [...initialVisualizations, ...customCharts];
 
   return (
     <div className="min-h-screen bg-background">
@@ -111,7 +116,15 @@ export default function AnalysisPage() {
 
           <TabsContent value="visualizations" className="mt-0">
             <div>
-              <h2 className="text-2xl font-semibold mb-6">Visualizations</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold">Visualizations</h2>
+                <CreateChartDialog
+                  analysisId={id!}
+                  onChartCreated={(chart) => {
+                    setCustomCharts(prev => [...prev, chart]);
+                  }}
+                />
+              </div>
               {visualizations.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {visualizations.map((viz) => (
@@ -121,6 +134,7 @@ export default function AnalysisPage() {
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
                   <p>No visualizations available for this data.</p>
+                  <p className="mt-2 text-sm">Click "Create Custom Chart" to get started.</p>
                 </div>
               )}
             </div>

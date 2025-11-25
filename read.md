@@ -5,7 +5,6 @@ DataViz AI is an intelligent data analysis and visualization platform that autom
 
 **Last Updated:** November 17, 2025
 
-## Replit Setup
 
 This project is configured to run in the Replit environment with:
 - **Development Server**: Runs on port 5000 (combines Express backend + Vite frontend)

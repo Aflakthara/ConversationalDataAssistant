@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
 import type { ParsedData, ChartConfig } from "@shared/schema";
+import { generateMLVisualizations } from "./ml-chart-recommender";
 
 export function parseCSV(fileBuffer: Buffer): ParsedData {
   const csvContent = fileBuffer.toString("utf-8");
@@ -29,20 +30,90 @@ export function parseExcel(fileBuffer: Buffer): ParsedData {
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   
-  // Convert to JSON
+  // Try to find the header row by checking first few rows
+  let headerRow = 0;
+  let maxHeaderScore = 0;
+  
+  // Check first 5 rows to find the best header row
+  for (let i = 0; i < Math.min(5, XLSX.utils.decode_range(worksheet['!ref'] || 'A1').e.r + 1); i++) {
+    const testRow = XLSX.utils.sheet_to_json(worksheet, { 
+      header: i,
+      range: i,
+      defval: null 
+    }) as any[];
+    
+    if (testRow.length > 0) {
+      const firstRow = testRow[0];
+      const keys = Object.keys(firstRow);
+      // Score: prefer rows with more non-empty, non-numeric-looking keys
+      const score = keys.filter(key => {
+        const val = String(key || '').trim();
+        return val && 
+               val !== '' && 
+               !/^empty\d+$/i.test(val) && 
+               !/^column\d+$/i.test(val) &&
+               !/^[A-Z]\d+$/.test(val); // Not Excel cell references
+      }).length;
+      
+      if (score > maxHeaderScore) {
+        maxHeaderScore = score;
+        headerRow = i;
+      }
+    }
+  }
+  
+  // Convert to JSON with detected header row
   const rows = XLSX.utils.sheet_to_json(worksheet, { 
+    header: headerRow,
     raw: false,
-    defval: null 
+    defval: null,
+    blankrows: false
   }) as Record<string, any>[];
 
   if (rows.length === 0) {
     throw new Error("Excel file contains no data");
   }
 
-  const columns = Object.keys(rows[0]);
-  const columnTypes = detectColumnTypes(rows, columns);
+  let columns = Object.keys(rows[0]);
+  
+  // Clean up column names - fix empty1, empty2, etc.
+  columns = columns.map((col, index) => {
+    const trimmed = String(col || '').trim();
+    
+    // If column name is empty or looks like "empty1", "empty2", try to infer from data
+    if (!trimmed || /^empty\d+$/i.test(trimmed) || /^column\d+$/i.test(trimmed) || /^[A-Z]\d+$/.test(trimmed)) {
+      // Try to infer column name from first non-empty value in that column
+      for (const row of rows.slice(0, 10)) {
+        const values = Object.values(row);
+        const value = values[index];
+        if (value !== null && value !== undefined && value !== '') {
+          const strVal = String(value).trim();
+          // If it looks like a header value (short, not too long), use it
+          if (strVal.length < 50 && strVal.length > 0) {
+            return `Column_${index + 1}_${strVal.substring(0, 20)}`;
+          }
+        }
+      }
+      // Fallback to generic name
+      return `Column_${index + 1}`;
+    }
+    
+    return trimmed || `Column_${index + 1}`;
+  });
+  
+  // Rebuild rows with cleaned column names
+  const cleanedRows = rows.map(row => {
+    const cleaned: Record<string, any> = {};
+    const oldKeys = Object.keys(row);
+    oldKeys.forEach((oldKey, idx) => {
+      cleaned[columns[idx]] = row[oldKey];
+    });
+    return cleaned;
+  });
+  
+  const columnTypes = detectColumnTypes(cleanedRows, columns);
 
-  return { columns, rows, columnTypes };
+  return { columns, rows: cleanedRows, columnTypes };
 }
 
 export function parseJSON(fileBuffer: Buffer): ParsedData {
@@ -127,7 +198,20 @@ function detectColumnTypes(
   return types;
 }
 
-export function generateVisualizations(parsedData: ParsedData): ChartConfig[] {
+export function generateVisualizations(parsedData: ParsedData, useML: boolean = true): ChartConfig[] {
+  // Use ML-based recommendations if enabled
+  if (useML) {
+    try {
+      const mlVisualizations = generateMLVisualizations(parsedData);
+      if (mlVisualizations.length > 0) {
+        return mlVisualizations;
+      }
+    } catch (error) {
+      console.warn("ML visualization generation failed, falling back to rule-based:", error);
+    }
+  }
+  
+  // Fallback to original rule-based approach
   const visualizations: ChartConfig[] = [];
   const { columns, rows, columnTypes } = parsedData;
 

@@ -22,7 +22,7 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
   const onDropRejected = useCallback(() => {
     toast({
       title: "Unsupported File Type",
-      description: "Please upload a CSV, Excel (XLSX/XLS), or JSON file.",
+      description: "Please upload a CSV, Excel (XLSX/XLS), JSON, or PDF file.",
       variant: "destructive",
     });
   }, [toast]);
@@ -35,6 +35,7 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
       'application/vnd.ms-excel': ['.xls'],
       'application/json': ['.json'],
+      'application/pdf': ['.pdf'],
     },
     multiple: false,
     disabled: isUploading,
@@ -70,7 +71,7 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
           <p className="text-muted-foreground max-w-md">
             {isUploading 
               ? 'Processing your file and generating insights...'
-              : 'Drag and drop your CSV, Excel, or JSON file here, or click to browse'
+              : 'Drag and drop your CSV, Excel, JSON, or PDF file here, or click to browse'
             }
           </p>
         </div>
